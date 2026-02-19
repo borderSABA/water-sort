@@ -1,0 +1,682 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Water Sort Test</title>
+  <style>
+    :root{
+      --bg:#0f1220;
+      --text:#e9ecff;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans JP", "Hiragino Sans", "Yu Gothic", sans-serif;
+      background: radial-gradient(1200px 600px at 20% 0%, #1b2150 0%, var(--bg) 55%), var(--bg);
+      color:var(--text);
+    }
+
+    header{
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      padding: 12px;
+      display:flex;
+      justify-content:center;
+      backdrop-filter: blur(10px);
+      background: rgba(15,18,32,.55);
+      border-bottom: 1px solid rgba(255,255,255,.08);
+    }
+    .controls{ display:flex; gap:10px; width:min(520px, 100%); }
+
+    button{
+      flex:1;
+      border:0;
+      background: linear-gradient(180deg, #2a3160, #1e2446);
+      color:var(--text);
+      padding:12px 12px;
+      border-radius:14px;
+      cursor:pointer;
+      font-weight:800;
+      letter-spacing:.2px;
+      box-shadow: 0 8px 20px rgba(0,0,0,.25);
+    }
+    button:hover{filter:brightness(1.06)}
+    button:disabled{ opacity:.45; cursor:not-allowed; filter:none; }
+    .danger{ background: linear-gradient(180deg, #ff5a75, #c7324a); }
+
+    main{ padding: 10px 12px 18px; }
+    .board{
+      width:min(920px, 100%);
+      margin:0 auto;
+      background: rgba(0,0,0,.18);
+      border: 1px solid rgba(255,255,255,.10);
+      border-radius: 18px;
+      padding: 14px;
+      min-height: 360px;
+    }
+
+    .grid{
+      display:grid;
+      grid-template-columns: repeat(auto-fit, minmax(86px, 1fr));
+      gap: 12px;
+      align-items:end;
+    }
+
+    .bottle{
+      position:relative;
+      padding: 8px 8px 10px;
+      border-radius: 16px;
+      background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.03));
+      border: 1px solid rgba(255,255,255,.10);
+      box-shadow: inset 0 0 0 1px rgba(0,0,0,.15);
+      cursor:pointer;
+      user-select:none;
+      transition: transform .08s ease, box-shadow .12s ease, border-color .12s ease;
+    }
+    .bottle:hover{ transform: translateY(-1px); }
+
+    .bottle.selected{
+      border-color: rgba(122,162,255,.95);
+      box-shadow: 0 0 0 2px rgba(122,162,255,.25), 0 12px 30px rgba(0,0,0,.30);
+    }
+
+    .bottle .neck{
+      height: 10px;
+      width: 42px;
+      margin: 0 auto 8px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.08);
+      border: 1px solid rgba(255,255,255,.10);
+    }
+
+    .layers{
+      height: 180px;
+      border-radius: 12px;
+      overflow:hidden;
+      display:flex;
+      flex-direction:column-reverse; /* 下→上 */
+      background: rgba(0,0,0,.18);
+      border: 1px solid rgba(255,255,255,.10);
+    }
+
+    .layer{
+      flex: 1 1 20%;
+      border-top: 1px solid rgba(0,0,0,.25);
+      position:relative;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-weight: 900;
+      font-size: 16px;
+      letter-spacing: .2px;
+      text-shadow: 0 1px 2px rgba(0,0,0,.75), 0 0 8px rgba(0,0,0,.35);
+    }
+    .layer::after{
+      content:"";
+      position:absolute;
+      inset:0;
+      background: linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,0));
+      pointer-events:none;
+      mix-blend-mode: overlay;
+    }
+    .layer[data-mark]::before{
+      content: attr(data-mark);
+      color: rgba(255,255,255,.92);
+      mix-blend-mode: soft-light;
+    }
+
+    .layer.empty{
+      background: rgba(255,255,255,.02);
+      border-top: 1px solid rgba(255,255,255,.06);
+    }
+
+    /* パターン（同系色でも見分ける） */
+    .layer.pat0{ background-image: repeating-linear-gradient(45deg, rgba(255,255,255,.22) 0 6px, rgba(0,0,0,0) 6px 12px); }
+    .layer.pat1{ background-image: repeating-linear-gradient(90deg, rgba(255,255,255,.20) 0 5px, rgba(0,0,0,0) 5px 10px); }
+    .layer.pat2{ background-image: repeating-linear-gradient(0deg, rgba(255,255,255,.20) 0 5px, rgba(0,0,0,0) 5px 10px); }
+    .layer.pat3{ background-image: radial-gradient(circle at 25% 30%, rgba(255,255,255,.20) 0 2px, rgba(0,0,0,0) 2px 10px), radial-gradient(circle at 70% 75%, rgba(255,255,255,.18) 0 2px, rgba(0,0,0,0) 2px 10px); background-size: 14px 14px; }
+    .layer.pat4{ background-image: repeating-linear-gradient(135deg, rgba(255,255,255,.18) 0 3px, rgba(0,0,0,0) 3px 9px); }
+    .layer.pat5{ background-image: repeating-linear-gradient(45deg, rgba(0,0,0,.18) 0 2px, rgba(0,0,0,0) 2px 8px), repeating-linear-gradient(-45deg, rgba(255,255,255,.14) 0 2px, rgba(0,0,0,0) 2px 8px); }
+    .layer.pat6{ background-image: linear-gradient(0deg, rgba(255,255,255,.18), rgba(0,0,0,0)), repeating-linear-gradient(90deg, rgba(0,0,0,.14) 0 2px, rgba(0,0,0,0) 2px 9px); }
+    .layer.pat7{ background-image: repeating-linear-gradient(0deg, rgba(0,0,0,.18) 0 2px, rgba(0,0,0,0) 2px 7px); }
+    .layer.pat8{ background-image: repeating-linear-gradient(90deg, rgba(0,0,0,.16) 0 2px, rgba(0,0,0,0) 2px 7px); }
+    .layer.pat9{ background-image: radial-gradient(circle at 50% 50%, rgba(255,255,255,.16) 0 3px, rgba(0,0,0,0) 3px 12px); background-size: 16px 16px; }
+    .layer.pat10{ background-image: linear-gradient(90deg, rgba(255,255,255,.14), rgba(0,0,0,0)), repeating-linear-gradient(135deg, rgba(0,0,0,.14) 0 2px, rgba(0,0,0,0) 2px 10px); }
+    .layer.pat11{ background-image: repeating-linear-gradient(45deg, rgba(255,255,255,.12) 0 2px, rgba(0,0,0,0) 2px 6px), repeating-linear-gradient(90deg, rgba(0,0,0,.10) 0 1px, rgba(0,0,0,0) 1px 6px); }
+
+    /* 満タン完成演出 */
+    .bottle.completed{
+      border-color: rgba(92,225,168,.55);
+      box-shadow: 0 0 0 2px rgba(92,225,168,.18), 0 14px 34px rgba(0,0,0,.32);
+    }
+    .bottle.completed .neck{
+      border-color: rgba(92,225,168,.45);
+      background: rgba(92,225,168,.10);
+    }
+    .bottle.just-completed{ animation: completedPulse .78s ease-out 1; }
+    .bottle.just-completed::after{
+      content:"";
+      position:absolute;
+      inset:-8px;
+      border-radius: 24px;
+      pointer-events:none;
+      background:
+        radial-gradient(circle at 15% 20%, rgba(255,255,255,.55) 0 2px, rgba(0,0,0,0) 3px 18px),
+        radial-gradient(circle at 70% 25%, rgba(255,255,255,.45) 0 2px, rgba(0,0,0,0) 3px 18px),
+        radial-gradient(circle at 30% 75%, rgba(255,255,255,.40) 0 2px, rgba(0,0,0,0) 3px 18px),
+        radial-gradient(circle at 80% 78%, rgba(255,255,255,.35) 0 2px, rgba(0,0,0,0) 3px 18px);
+      opacity:0;
+      animation: sparkle .78s ease-out 1;
+    }
+    @keyframes completedPulse{
+      0%{ transform: translateY(0) scale(1); filter: brightness(1); }
+      35%{ transform: translateY(-3px) scale(1.03); filter: brightness(1.10); }
+      100%{ transform: translateY(0) scale(1); filter: brightness(1); }
+    }
+    @keyframes sparkle{
+      0%{ opacity:0; transform: scale(.98); }
+      25%{ opacity:.85; transform: scale(1.01); }
+      100%{ opacity:0; transform: scale(1.03); }
+    }
+
+    /* ===== 派手めFX（満タン＆クリア） ===== */
+    #flash{
+      position:fixed;
+      inset:0;
+      pointer-events:none;
+      opacity:0;
+      background:
+        radial-gradient(800px 420px at 50% 45%, rgba(255,255,255,.22), rgba(0,0,0,0) 60%),
+        radial-gradient(1200px 700px at 50% 50%, rgba(122,162,255,.10), rgba(0,0,0,0) 70%);
+      mix-blend-mode: screen;
+    }
+    #flash.play{ animation: flashPop .42s ease-out 1; }
+    @keyframes flashPop{
+      0%{ opacity:0; }
+      18%{ opacity:1; }
+      100%{ opacity:0; }
+    }
+
+    .fx{ position:fixed; inset:0; pointer-events:none; overflow:visible; }
+
+    .ring{
+      position:fixed;
+      left: var(--x);
+      top: var(--y);
+      width: 14px;
+      height: 14px;
+      border-radius: 999px;
+      transform: translate(-50%,-50%) scale(.6);
+      border: 2px solid rgba(255,255,255,.65);
+      box-shadow:
+        0 0 22px rgba(255,255,255,.35),
+        0 0 36px rgba(122,162,255,.25);
+      filter: drop-shadow(0 10px 20px rgba(0,0,0,.25));
+      opacity:.95;
+      animation: ringPop .62s ease-out 1;
+    }
+    @keyframes ringPop{
+      0%{ transform: translate(-50%,-50%) scale(.55); opacity:.0; }
+      15%{ opacity:1; }
+      100%{ transform: translate(-50%,-50%) scale(8.2); opacity:0; }
+    }
+
+    .particle{
+      position:fixed;
+      left: var(--x);
+      top: var(--y);
+      width: var(--s);
+      height: var(--s);
+      border-radius: 3px;
+      background: var(--c);
+      box-shadow:
+        0 0 0 1px rgba(255,255,255,.18) inset,
+        0 6px 18px rgba(0,0,0,.25),
+        0 0 24px rgba(255,255,255,.20);
+      transform: translate(-50%,-50%);
+      opacity: 1;
+      animation: particleFly var(--d) cubic-bezier(.2,.9,.2,1) 1;
+      will-change: transform, opacity;
+    }
+    @keyframes particleFly{
+      0%{ transform: translate(-50%,-50%) translate(0px, 0px) rotate(0deg); opacity: 1; }
+      70%{ opacity: .95; }
+      100%{ transform: translate(-50%,-50%) translate(var(--dx), var(--dy)) rotate(var(--r)); opacity: 0; }
+    }
+
+    .board.shake{ animation: boardShake .28s ease-in-out 1; }
+    @keyframes boardShake{
+      0%{ transform: translateX(0) }
+      18%{ transform: translateX(-3px) }
+      36%{ transform: translateX(3px) }
+      54%{ transform: translateX(-2px) }
+      72%{ transform: translateX(2px) }
+      100%{ transform: translateX(0) }
+    }
+
+    /* もともとの完成演出を強化（光る→色相が少し動く） */
+    .bottle.just-completed{
+      animation: completedPulse .78s ease-out 1, hueWobble .62s ease-out 1;
+    }
+    @keyframes hueWobble{
+      0%{ filter: brightness(1) saturate(1); }
+      30%{ filter: brightness(1.15) saturate(1.25); }
+      100%{ filter: brightness(1) saturate(1); }
+    }
+
+    /* スマホ縦画面最適化 */
+    @media (max-width: 520px){
+      .grid{ grid-template-columns: repeat(4, minmax(82px, 1fr)); gap: 10px; }
+      .layers{ height: 168px; }
+    }
+    @media (max-width: 380px){
+      .grid{ grid-template-columns: repeat(3, minmax(86px, 1fr)); }
+      .layers{ height: 160px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="controls">
+      <button id="undoBtn" disabled>一手戻る</button>
+      <button id="restartBtn" class="danger">リセット</button>
+    </div>
+  </header>
+
+  <div id="flash"></div>
+  <div id="fx" class="fx"></div>
+
+  <main>
+    <div class="board">
+      <div id="grid" class="grid"></div>
+    </div>
+  </main>
+
+<script>
+(() => {
+  const CAPACITY = 5;
+
+  function emptyBottleCount(n) {
+    if (n < 7) return 2;
+    if (n < 15) return 3;
+    return 4;
+  }
+
+  function colorOf(id) {
+    if (id < 0) return 'rgba(255,255,255,0.04)';
+    const h = (id * 0.137) % 1;
+    const H = Math.round(h * 360);
+    return `hsl(${H} 75% 58%)`;
+  }
+
+  const PATTERN_COUNT = 12;
+  const MARKERS = ['●','■','▲','◆','★','✚','✖','✳','☘','☀','☾','♠','♣','♥','♦','☂','☁','☯','✿','⌁'];
+  function markerOf(id) {
+    const sym = MARKERS[id % MARKERS.length];
+    const grp = Math.floor(id / MARKERS.length);
+    return grp > 0 ? (sym + String(grp + 1)) : sym;
+  }
+  function patternIndexOf(id) {
+    return ((id % PATTERN_COUNT) + PATTERN_COUNT) % PATTERN_COUNT;
+  }
+
+  let state = null;
+  let undoStack = [];
+  let selectedFrom = -1;
+  let autoAdvancePending = false;
+  let justCompletedUntil = new Map();
+
+  let N = 3;
+  let seed = 12345;
+
+  function mulberry32(a) {
+    return function() {
+      let t = a += 0x6D2B79F5;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  function deepCopyState(s) {
+    return { capacity: s.capacity, bottles: s.bottles.map(b => b.slice()) };
+  }
+
+  function topColor(b) { return b.length === 0 ? -1 : b[b.length - 1]; }
+  function topRunLength(b) {
+    if (b.length === 0) return 0;
+    const c = topColor(b);
+    let run = 0;
+    for (let i = b.length - 1; i >= 0; i--) {
+      if (b[i] !== c) break;
+      run++;
+    }
+    return run;
+  }
+
+  function canPour(from, to) {
+    if (from === to) return false;
+    const a = state.bottles[from];
+    const b = state.bottles[to];
+    if (a.length === 0) return false;
+    if (b.length >= state.capacity) return false;
+    if (b.length === 0) return true;
+    return topColor(a) === topColor(b);
+  }
+
+  function pour(from, to) {
+    if (!canPour(from, to)) return 0;
+    const a = state.bottles[from];
+    const b = state.bottles[to];
+    const color = topColor(a);
+    const run = topRunLength(a);
+    const space = state.capacity - b.length;
+    const move = Math.min(run, space);
+    for (let i = 0; i < move; i++) { a.pop(); b.push(color); }
+    return move;
+  }
+
+  function isUniformFull(b) {
+    if (b.length !== state.capacity) return false;
+    const c = b[0];
+    for (let i = 1; i < b.length; i++) if (b[i] !== c) return false;
+    return true;
+  }
+
+  function completedFlags() { return state.bottles.map(b => isUniformFull(b)); }
+
+  function isSolved() {
+    for (const b of state.bottles) {
+      if (b.length === 0) continue;
+      if (!isUniformFull(b)) return false;
+    }
+    return true;
+  }
+
+  function generate(nColors, capacity, seedValue) {
+    const empties = emptyBottleCount(nColors);
+    const maxAttempts = 80;
+
+    let last = null;
+
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const rng = mulberry32((seedValue + attempt * 9973) >>> 0);
+
+      const pool = [];
+      for (let c = 0; c < nColors; c++) for (let i = 0; i < capacity; i++) pool.push(c);
+      for (let i = pool.length - 1; i > 0; i--) {
+        const j = Math.floor(rng() * (i + 1));
+        const tmp = pool[i]; pool[i] = pool[j]; pool[j] = tmp;
+      }
+
+      const bottles = [];
+      let p = 0;
+      for (let b = 0; b < nColors; b++) {
+        const arr = [];
+        for (let k = 0; k < capacity; k++) arr.push(pool[p++]);
+        bottles.push(arr);
+      }
+      for (let i = 0; i < empties; i++) bottles.push([]);
+
+      const s = { capacity, bottles };
+      last = s;
+
+      // 混ざりが薄すぎるのを弾く（最低2本は混ざる）
+      let mixed = 0;
+      for (let i = 0; i < nColors; i++) {
+        const b = bottles[i];
+        const first = b[0];
+        for (let k = 1; k < b.length; k++) { if (b[k] !== first) { mixed++; break; } }
+      }
+      if (mixed < Math.min(2, nColors)) continue;
+
+      state = deepCopyState(s);
+      if (isSolved()) continue;
+
+      return deepCopyState(s);
+    }
+
+    return deepCopyState(last);
+  }
+
+  const grid = document.getElementById('grid');
+  const undoBtn = document.getElementById('undoBtn');
+  const restartBtn = document.getElementById('restartBtn');
+  const fx = document.getElementById('fx');
+  const flash = document.getElementById('flash');
+  const board = document.querySelector('.board');
+
+  function playFlash() {
+    if (!flash) return;
+    flash.classList.remove('play');
+    // reflow
+    void flash.offsetWidth;
+    flash.classList.add('play');
+  }
+
+  function shake() {
+    if (!board) return;
+    board.classList.remove('shake');
+    void board.offsetWidth;
+    board.classList.add('shake');
+  }
+
+  function vibrate(ms) {
+    try {
+      if (navigator.vibrate) navigator.vibrate(ms);
+    } catch (_) {}
+  }
+
+  function spawnRingAt(x, y) {
+    if (!fx) return;
+    const ring = document.createElement('div');
+    ring.className = 'ring';
+    ring.style.setProperty('--x', x + 'px');
+    ring.style.setProperty('--y', y + 'px');
+    fx.appendChild(ring);
+    ring.addEventListener('animationend', () => ring.remove(), { once: true });
+  }
+
+  function spawnParticlesAt(x, y, baseColor, count, spread) {
+    if (!fx) return;
+    for (let i = 0; i < count; i++) {
+      const p = document.createElement('div');
+      p.className = 'particle';
+      const a = (Math.random() * Math.PI * 2);
+      const r = (Math.random() * spread);
+      const dx = Math.cos(a) * r;
+      const dy = Math.sin(a) * r - (Math.random() * spread * 0.55);
+      const size = (6 + Math.random() * 8);
+      const dur = (520 + Math.random() * 520);
+      const rot = (Math.random() * 420 - 210) + 'deg';
+
+      p.style.setProperty('--x', x + 'px');
+      p.style.setProperty('--y', y + 'px');
+      p.style.setProperty('--dx', dx.toFixed(1) + 'px');
+      p.style.setProperty('--dy', dy.toFixed(1) + 'px');
+      p.style.setProperty('--s', size.toFixed(0) + 'px');
+      p.style.setProperty('--d', dur.toFixed(0) + 'ms');
+      p.style.setProperty('--r', rot);
+
+      // ベース色 + 少し白寄せ
+      p.style.setProperty('--c', baseColor);
+
+      fx.appendChild(p);
+      p.addEventListener('animationend', () => p.remove(), { once: true });
+    }
+  }
+
+  function bottleCenter(index) {
+    const el = grid.children[index];
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    return { x: r.left + r.width * 0.5, y: r.top + r.height * 0.45 };
+  }
+
+  function completionFX(index) {
+    const c = bottleCenter(index);
+    if (!c) return;
+    // その瓶の色（なければ白）
+    const b = state.bottles[index];
+    const id = (b && b.length > 0) ? b[0] : -1;
+    const base = (id >= 0) ? colorOf(id) : 'rgba(255,255,255,.9)';
+
+    spawnRingAt(c.x, c.y);
+    spawnParticlesAt(c.x, c.y, base, 26, 140);
+    playFlash();
+    shake();
+    vibrate(18);
+  }
+
+  function clearFX() {
+    // 画面中央で派手に
+    const cx = window.innerWidth * 0.5;
+    const cy = window.innerHeight * 0.42;
+    spawnRingAt(cx, cy);
+    spawnParticlesAt(cx, cy, 'rgba(255,255,255,.95)', 60, 260);
+    playFlash();
+    shake();
+    vibrate([20, 40, 20]);
+  }
+
+  function updateButtons() {
+    undoBtn.disabled = undoStack.length === 0;
+  }
+
+  function render() {
+    grid.innerHTML = '';
+    const total = state.bottles.length;
+    const now = performance.now();
+
+    for (let i = 0; i < total; i++) {
+      const b = state.bottles[i];
+
+      let cls = 'bottle';
+      if (i === selectedFrom) cls += ' selected';
+      const completed = isUniformFull(b);
+      if (completed) cls += ' completed';
+
+      const until = justCompletedUntil.get(i);
+      if (until && until > now) cls += ' just-completed';
+      else if (until && until <= now) justCompletedUntil.delete(i);
+
+      const bottle = document.createElement('div');
+      bottle.className = cls;
+      bottle.addEventListener('click', () => onBottleClick(i));
+
+      const neck = document.createElement('div');
+      neck.className = 'neck';
+
+      const layers = document.createElement('div');
+      layers.className = 'layers';
+
+      for (let slot = 0; slot < state.capacity; slot++) {
+        const layer = document.createElement('div');
+        layer.className = 'layer';
+
+        if (slot < b.length) {
+          const id = b[slot];
+          layer.style.backgroundColor = colorOf(id);
+          layer.dataset.mark = markerOf(id);
+          layer.classList.add('pat' + patternIndexOf(id));
+        } else {
+          layer.classList.add('empty');
+        }
+
+        layers.appendChild(layer);
+      }
+
+      bottle.appendChild(neck);
+      bottle.appendChild(layers);
+      grid.appendChild(bottle);
+    }
+
+    updateButtons();
+  }
+
+  function onBottleClick(index) {
+    if (autoAdvancePending) return;
+    if (isSolved()) return;
+
+    if (selectedFrom < 0) {
+      if (state.bottles[index].length === 0) return;
+      selectedFrom = index;
+      render();
+      return;
+    }
+
+    if (index === selectedFrom) {
+      selectedFrom = -1;
+      render();
+      return;
+    }
+
+    if (!canPour(selectedFrom, index)) {
+      selectedFrom = -1;
+      render();
+      return;
+    }
+
+    const before = completedFlags();
+    undoStack.push(deepCopyState(state));
+    const moved = pour(selectedFrom, index);
+
+    const after = completedFlags();
+    const now = performance.now();
+    const newly = [];
+    for (let i = 0; i < after.length; i++) {
+      if (after[i] && !before[i]) {
+        justCompletedUntil.set(i, now + 900);
+        newly.push(i);
+      }
+    }
+
+    selectedFrom = -1;
+    render();
+
+    // 満タンになった瓶の派手演出
+    for (const i of newly) completionFX(i);
+
+    // クリア時演出（さらに派手）
+    if (moved > 0 && isSolved()) {
+      clearFX();
+      autoAdvancePending = true;
+      setTimeout(() => {
+        autoAdvancePending = false;
+        startLevel(N + 1, seed + 1);
+      }, 650);
+      return;
+    }
+  }
+
+  function startLevel(n, newSeed) {
+    N = n;
+    seed = newSeed;
+    state = generate(N, CAPACITY, seed);
+    undoStack = [];
+    selectedFrom = -1;
+    justCompletedUntil = new Map();
+    render();
+  }
+
+  undoBtn.addEventListener('click', () => {
+    if (undoStack.length === 0) return;
+    state = undoStack.pop();
+    selectedFrom = -1;
+    justCompletedUntil = new Map();
+    render();
+  });
+
+  restartBtn.addEventListener('click', () => {
+    seed++;
+    startLevel(N, seed);
+  });
+
+  // 初期起動
+  startLevel(N, seed);
+})();
+</script>
+</body>
+</html>
