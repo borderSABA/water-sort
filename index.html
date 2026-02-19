@@ -10,11 +10,16 @@
       --text:#e9ecff;
     }
     *{box-sizing:border-box}
+    html, body{ height:100%; }
     body{
       margin:0;
       font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans JP", "Hiragino Sans", "Yu Gothic", sans-serif;
       background: radial-gradient(1200px 600px at 20% 0%, #1b2150 0%, var(--bg) 55%), var(--bg);
       color:var(--text);
+      height: 100dvh;
+      overflow: hidden;
+      display:flex;
+      flex-direction:column;
     }
 
     header{
@@ -46,7 +51,7 @@
     button:disabled{ opacity:.45; cursor:not-allowed; filter:none; }
     .danger{ background: linear-gradient(180deg, #ff5a75, #c7324a); }
 
-    main{ padding: 10px 12px 18px; }
+    main{ padding: 10px 12px 18px; flex:1; min-height:0; overflow:hidden; }
     .board{
       width:min(920px, 100%);
       margin:0 auto;
@@ -54,7 +59,8 @@
       border: 1px solid rgba(255,255,255,.14);
       border-radius: 18px;
       padding: 14px;
-      min-height: 360px;
+      min-height: 0;
+      height: 100%;
       box-shadow:
         0 18px 50px rgba(0,0,0,.30),
         inset 0 0 0 1px rgba(0,0,0,.18);
@@ -63,8 +69,11 @@
     .grid{
       display:grid;
       grid-template-columns: repeat(auto-fit, minmax(86px, 1fr));
-      gap: 12px;
+      gap: var(--gap, 12px);
       align-items:end;
+      align-content: stretch;
+      height: 100%;
+      grid-auto-rows: 1fr;
     }
 
     .bottle{
@@ -119,7 +128,7 @@
     }
 
     .layers{
-      height: 180px;
+      height: var(--layers-h, 180px);
       border-radius: 12px;
       overflow:hidden;
       display:flex;
@@ -139,7 +148,7 @@
       align-items:center;
       justify-content:center;
       font-weight: 900;
-      font-size: 16px;
+      font-size: var(--mark-size, 16px);
       letter-spacing: .2px;
       text-shadow: 0 1px 2px rgba(0,0,0,.75), 0 0 8px rgba(0,0,0,.35);
     }
@@ -477,6 +486,91 @@
   const fx = document.getElementById('fx');
   const flash = document.getElementById('flash');
   const board = document.querySelector('.board');
+  const headerEl = document.querySelector('header');
+  const mainEl = document.querySelector('main');
+
+  let fitRaf = 0;
+  function scheduleFit(){
+    if (fitRaf) return;
+    fitRaf = requestAnimationFrame(() => {
+      fitRaf = 0;
+      fitLayout();
+    });
+  }
+
+  function fitLayout(){
+    // なるべく“1画面内”に収める（スマホのアドレスバー変動に強い）
+    const vv = window.visualViewport;
+    const vh = vv ? vv.height : window.innerHeight;
+    const headerH = headerEl ? headerEl.getBoundingClientRect().height : 0;
+
+    if (mainEl) {
+      mainEl.style.height = Math.max(0, vh - headerH) + 'px';
+    }
+    if (!board) return;
+
+    // mainの内側高さをボードに割り当てる
+    let mainInnerH = vh - headerH;
+    if (mainEl) {
+      const mr = mainEl.getBoundingClientRect();
+      const cs = getComputedStyle(mainEl);
+      const padT = parseFloat(cs.paddingTop) || 0;
+      const padB = parseFloat(cs.paddingBottom) || 0;
+      mainInnerH = mr.height - padT - padB;
+    }
+    board.style.height = Math.max(0, mainInnerH) + 'px';
+
+    // ボード内側サイズ
+    const br = board.getBoundingClientRect();
+    const bcs = getComputedStyle(board);
+    const bpadX = (parseFloat(bcs.paddingLeft) || 0) + (parseFloat(bcs.paddingRight) || 0);
+    const bpadY = (parseFloat(bcs.paddingTop) || 0) + (parseFloat(bcs.paddingBottom) || 0);
+    const innerW = Math.max(0, br.width - bpadX);
+    const innerH = Math.max(0, br.height - bpadY);
+
+    const count = state ? state.bottles.length : 0;
+    if (count <= 0) return;
+
+    const isSmall = window.innerWidth <= 520;
+    const gap = isSmall ? 8 : 12;
+
+    const minCols = 3;
+    const maxCols = Math.min(12, Math.max(minCols, count));
+    const minCellW = isSmall ? (window.innerWidth <= 380 ? 64 : 68) : 76;
+    const overhead = isSmall ? 56 : 60; // neck + padding 等のざっくり
+    const minLayersH = isSmall ? 88 : 110;
+
+    let best = null;
+    for (let cols = minCols; cols <= maxCols; cols++) {
+      const rows = Math.ceil(count / cols);
+      const cellW = (innerW - gap * (cols - 1)) / cols;
+      const cellH = (innerH - gap * (rows - 1)) / rows;
+      const layersH = cellH - overhead;
+
+      const ok = (cellW >= minCellW) && (layersH >= minLayersH);
+      const score = (Math.min(cellW, 140) * 0.7) + (Math.min(layersH, 220) * 1.3) + (ok ? 1000 : 0);
+
+      if (!best || score > best.score) {
+        best = { cols, rows, cellW, cellH, layersH, score };
+      }
+    }
+
+    if (!best) return;
+
+    grid.style.gridTemplateColumns = `repeat(${best.cols}, minmax(0, 1fr))`;
+    grid.style.setProperty('--gap', `${gap}px`);
+
+    const layersHpx = Math.max(70, Math.floor(best.layersH));
+    document.documentElement.style.setProperty('--layers-h', `${layersHpx}px`);
+
+    const markSize = Math.max(11, Math.min(16, Math.floor(layersHpx / 11) + 9));
+    document.documentElement.style.setProperty('--mark-size', `${markSize}px`);
+  }
+
+  window.addEventListener('resize', scheduleFit, { passive: true });
+  window.addEventListener('orientationchange', scheduleFit);
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', scheduleFit);
+
 
   function playFlash() {
     if (!flash) return;
@@ -624,6 +718,7 @@
     }
 
     updateButtons();
+    scheduleFit();
   }
 
   function onBottleClick(index) {
@@ -702,6 +797,7 @@
   restartBtn.addEventListener('click', () => {
     seed++;
     startLevel(N, seed);
+  scheduleFit();
   });
 
   // 初期起動
