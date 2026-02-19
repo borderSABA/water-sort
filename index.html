@@ -2,22 +2,26 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Water Sort Test</title>
   <style>
     :root{
       --bg:#0f1220;
       --text:#e9ecff;
+      --gap: 10px;
+      --mark-size: 14px;
+      --row-h: 120px; /* JSで上書き */
     }
     *{box-sizing:border-box}
     html, body{ height:100%; }
+
     body{
       margin:0;
       font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans JP", "Hiragino Sans", "Yu Gothic", sans-serif;
       background: radial-gradient(1200px 600px at 20% 0%, #1b2150 0%, var(--bg) 55%), var(--bg);
       color:var(--text);
-      height: 100dvh;
-      overflow: hidden;
+      height: calc(var(--vh, 1vh) * 100);
+      overflow:hidden;
       display:flex;
       flex-direction:column;
     }
@@ -26,201 +30,81 @@
       position: sticky;
       top: 0;
       z-index: 50;
-      padding: 12px;
+      padding: calc(10px + env(safe-area-inset-top)) 12px 10px;
       display:flex;
       justify-content:center;
       backdrop-filter: blur(10px);
-      background: rgba(15,18,32,.55);
-      border-bottom: 1px solid rgba(255,255,255,.08);
+      background: rgba(15,18,32,.62);
+      border-bottom: 1px solid rgba(255,255,255,.10);
     }
-    .controls{ display:flex; gap:10px; width:min(520px, 100%); }
+
+    .controls{
+      width:min(720px, 100%);
+      display:grid;
+      grid-template-columns: 1fr 1fr 1fr 1.25fr;
+      gap: 10px;
+      align-items: stretch;
+    }
+
+    .nbox{
+      display:flex;
+      gap: 8px;
+      align-items: stretch;
+      padding: 6px;
+      border-radius: 14px;
+      background: rgba(255,255,255,.06);
+      border: 1px solid rgba(255,255,255,.10);
+      box-shadow: inset 0 0 0 1px rgba(0,0,0,.12);
+    }
+    .nbox input{
+      flex: 1;
+      min-width: 56px;
+      border: 0;
+      border-radius: 12px;
+      padding: 0 10px;
+      background: rgba(0,0,0,.20);
+      color: var(--text);
+      font-weight: 900;
+      text-align: center;
+      outline: none;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.08);
+      -webkit-appearance: none;
+      appearance: none;
+    }
+    .nbox input::-webkit-outer-spin-button,
+    .nbox input::-webkit-inner-spin-button{ -webkit-appearance: none; margin: 0; }
+    .nbox button{
+      flex: 0 0 auto;
+      padding: 10px 10px;
+      border-radius: 12px;
+    }
 
     button{
-      flex:1;
       border:0;
       background: linear-gradient(180deg, #2a3160, #1e2446);
       color:var(--text);
-      padding:12px 12px;
-      border-radius:14px;
+      padding: 12px 10px;
+      border-radius: 14px;
       cursor:pointer;
-      font-weight:800;
+      font-weight: 900;
       letter-spacing:.2px;
       box-shadow: 0 8px 20px rgba(0,0,0,.25);
+      -webkit-tap-highlight-color: transparent;
     }
-    button:hover{filter:brightness(1.06)}
+    button:hover{ filter: brightness(1.06); }
     button:disabled{ opacity:.45; cursor:not-allowed; filter:none; }
+
     .danger{ background: linear-gradient(180deg, #ff5a75, #c7324a); }
 
-    main{ padding: 10px 12px 18px; flex:1; min-height:0; overflow:hidden; }
-    .board{
-      width:min(920px, 100%);
-      margin:0 auto;
-      background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(0,0,0,.12));
-      border: 1px solid rgba(255,255,255,.14);
-      border-radius: 18px;
-      padding: 14px;
-      min-height: 0;
-      height: 100%;
-      box-shadow:
-        0 18px 50px rgba(0,0,0,.30),
-        inset 0 0 0 1px rgba(0,0,0,.18);
+    /* iPhoneの横幅が狭い時は崩れないように2列＋「初めから」「N」だけ全幅 */
+    @media (max-width: 390px){
+      .controls{ grid-template-columns: 1fr 1fr; }
+      #restartRunBtn{ grid-column: 1 / -1; }
+      .nbox{ grid-column: 1 / -1; padding: 5px; border-radius: 14px; }
+      button{ padding: 11px 10px; border-radius: 14px; }
+      .nbox button{ padding: 10px 10px; }
     }
 
-    .grid{
-      display:grid;
-      grid-template-columns: repeat(auto-fit, minmax(86px, 1fr));
-      gap: var(--gap, 12px);
-      align-items:end;
-      align-content: stretch;
-      height: 100%;
-      grid-auto-rows: 1fr;
-    }
-
-    .bottle{
-      position:relative;
-      padding: 8px 8px 10px;
-      border-radius: 16px;
-      background:
-        radial-gradient(120px 80px at 35% 20%, rgba(255,255,255,.18), rgba(255,255,255,0) 60%),
-        linear-gradient(180deg, rgba(255,255,255,.14), rgba(255,255,255,.05));
-      border: 1px solid rgba(255,255,255,.22);
-      box-shadow:
-        0 14px 34px rgba(0,0,0,.38),
-        inset 0 0 0 1px rgba(0,0,0,.22);
-      cursor:pointer;
-      user-select:none;
-      transition: transform .08s ease, box-shadow .12s ease, border-color .12s ease, filter .12s ease;
-    }
-
-    /* ガラスっぽい縁と反射 */
-    .bottle::before{
-      content:"";
-      position:absolute;
-      inset: 6px 6px 8px;
-      border-radius: 14px;
-      pointer-events:none;
-      border: 1px solid rgba(255,255,255,.14);
-      box-shadow:
-        inset 0 0 0 1px rgba(255,255,255,.06),
-        inset 0 -10px 18px rgba(0,0,0,.18);
-      background:
-        linear-gradient(110deg, rgba(255,255,255,.18), rgba(255,255,255,0) 40%);
-      opacity:.75;
-      mix-blend-mode: screen;
-    }
-    .bottle:hover{ transform: translateY(-1px); }
-
-    .bottle.selected{
-      border-color: rgba(122,162,255,.95);
-      box-shadow: 0 0 0 2px rgba(122,162,255,.25), 0 12px 30px rgba(0,0,0,.30);
-    }
-
-    .bottle .neck{
-      height: 10px;
-      width: 42px;
-      margin: 0 auto 8px;
-      border-radius: 999px;
-      background: rgba(255,255,255,.14);
-      border: 1px solid rgba(255,255,255,.22);
-      box-shadow:
-        inset 0 0 0 1px rgba(0,0,0,.18),
-        0 8px 16px rgba(0,0,0,.22);
-    }
-
-    .layers{
-      height: var(--layers-h, 180px);
-      border-radius: 12px;
-      overflow:hidden;
-      display:flex;
-      flex-direction:column-reverse; /* 下→上 */
-      background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(0,0,0,.18));
-      border: 1px solid rgba(255,255,255,.18);
-      box-shadow:
-        inset 0 10px 22px rgba(0,0,0,.18),
-        inset 0 -10px 22px rgba(255,255,255,.05);
-    }
-
-    .layer{
-      flex: 1 1 20%;
-      border-top: 1px solid rgba(0,0,0,.25);
-      position:relative;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      font-weight: 900;
-      font-size: var(--mark-size, 16px);
-      letter-spacing: .2px;
-      text-shadow: 0 1px 2px rgba(0,0,0,.75), 0 0 8px rgba(0,0,0,.35);
-    }
-    .layer::after{
-      content:"";
-      position:absolute;
-      inset:0;
-      background: linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,0));
-      pointer-events:none;
-      mix-blend-mode: overlay;
-    }
-    .layer[data-mark]::before{
-      content: attr(data-mark);
-      color: rgba(255,255,255,.92);
-      mix-blend-mode: soft-light;
-    }
-
-    .layer.empty{
-      background: rgba(255,255,255,.06);
-      border-top: 1px solid rgba(255,255,255,.10);
-    }
-
-    /* パターン（同系色でも見分ける） */
-    .layer.pat0{ background-image: repeating-linear-gradient(45deg, rgba(255,255,255,.22) 0 6px, rgba(0,0,0,0) 6px 12px); }
-    .layer.pat1{ background-image: repeating-linear-gradient(90deg, rgba(255,255,255,.20) 0 5px, rgba(0,0,0,0) 5px 10px); }
-    .layer.pat2{ background-image: repeating-linear-gradient(0deg, rgba(255,255,255,.20) 0 5px, rgba(0,0,0,0) 5px 10px); }
-    .layer.pat3{ background-image: radial-gradient(circle at 25% 30%, rgba(255,255,255,.20) 0 2px, rgba(0,0,0,0) 2px 10px), radial-gradient(circle at 70% 75%, rgba(255,255,255,.18) 0 2px, rgba(0,0,0,0) 2px 10px); background-size: 14px 14px; }
-    .layer.pat4{ background-image: repeating-linear-gradient(135deg, rgba(255,255,255,.18) 0 3px, rgba(0,0,0,0) 3px 9px); }
-    .layer.pat5{ background-image: repeating-linear-gradient(45deg, rgba(0,0,0,.18) 0 2px, rgba(0,0,0,0) 2px 8px), repeating-linear-gradient(-45deg, rgba(255,255,255,.14) 0 2px, rgba(0,0,0,0) 2px 8px); }
-    .layer.pat6{ background-image: linear-gradient(0deg, rgba(255,255,255,.18), rgba(0,0,0,0)), repeating-linear-gradient(90deg, rgba(0,0,0,.14) 0 2px, rgba(0,0,0,0) 2px 9px); }
-    .layer.pat7{ background-image: repeating-linear-gradient(0deg, rgba(0,0,0,.18) 0 2px, rgba(0,0,0,0) 2px 7px); }
-    .layer.pat8{ background-image: repeating-linear-gradient(90deg, rgba(0,0,0,.16) 0 2px, rgba(0,0,0,0) 2px 7px); }
-    .layer.pat9{ background-image: radial-gradient(circle at 50% 50%, rgba(255,255,255,.16) 0 3px, rgba(0,0,0,0) 3px 12px); background-size: 16px 16px; }
-    .layer.pat10{ background-image: linear-gradient(90deg, rgba(255,255,255,.14), rgba(0,0,0,0)), repeating-linear-gradient(135deg, rgba(0,0,0,.14) 0 2px, rgba(0,0,0,0) 2px 10px); }
-    .layer.pat11{ background-image: repeating-linear-gradient(45deg, rgba(255,255,255,.12) 0 2px, rgba(0,0,0,0) 2px 6px), repeating-linear-gradient(90deg, rgba(0,0,0,.10) 0 1px, rgba(0,0,0,0) 1px 6px); }
-
-    /* 満タン完成演出 */
-    .bottle.completed{
-      border-color: rgba(92,225,168,.55);
-      box-shadow: 0 0 0 2px rgba(92,225,168,.18), 0 14px 34px rgba(0,0,0,.32);
-    }
-    .bottle.completed .neck{
-      border-color: rgba(92,225,168,.45);
-      background: rgba(92,225,168,.10);
-    }
-    .bottle.just-completed{ animation: completedPulse .78s ease-out 1; }
-    .bottle.just-completed::after{
-      content:"";
-      position:absolute;
-      inset:-8px;
-      border-radius: 24px;
-      pointer-events:none;
-      background:
-        radial-gradient(circle at 15% 20%, rgba(255,255,255,.55) 0 2px, rgba(0,0,0,0) 3px 18px),
-        radial-gradient(circle at 70% 25%, rgba(255,255,255,.45) 0 2px, rgba(0,0,0,0) 3px 18px),
-        radial-gradient(circle at 30% 75%, rgba(255,255,255,.40) 0 2px, rgba(0,0,0,0) 3px 18px),
-        radial-gradient(circle at 80% 78%, rgba(255,255,255,.35) 0 2px, rgba(0,0,0,0) 3px 18px);
-      opacity:0;
-      animation: sparkle .78s ease-out 1;
-    }
-    @keyframes completedPulse{
-      0%{ transform: translateY(0) scale(1); filter: brightness(1); }
-      35%{ transform: translateY(-3px) scale(1.03); filter: brightness(1.10); }
-      100%{ transform: translateY(0) scale(1); filter: brightness(1); }
-    }
-    @keyframes sparkle{
-      0%{ opacity:0; transform: scale(.98); }
-      25%{ opacity:.85; transform: scale(1.01); }
-      100%{ opacity:0; transform: scale(1.03); }
-    }
-
-    /* ===== 派手めFX（満タン＆クリア） ===== */
     #flash{
       position:fixed;
       inset:0;
@@ -238,7 +122,7 @@
       100%{ opacity:0; }
     }
 
-    .fx{ position:fixed; inset:0; pointer-events:none; overflow:visible; }
+    .fx{ position:fixed; inset:0; pointer-events:none; }
 
     .ring{
       position:fixed;
@@ -252,12 +136,11 @@
       box-shadow:
         0 0 22px rgba(255,255,255,.35),
         0 0 36px rgba(122,162,255,.25);
-      filter: drop-shadow(0 10px 20px rgba(0,0,0,.25));
       opacity:.95;
       animation: ringPop .62s ease-out 1;
     }
     @keyframes ringPop{
-      0%{ transform: translate(-50%,-50%) scale(.55); opacity:.0; }
+      0%{ transform: translate(-50%,-50%) scale(.55); opacity:0; }
       15%{ opacity:1; }
       100%{ transform: translate(-50%,-50%) scale(8.2); opacity:0; }
     }
@@ -285,34 +168,203 @@
       100%{ transform: translate(-50%,-50%) translate(var(--dx), var(--dy)) rotate(var(--r)); opacity: 0; }
     }
 
-    .board.shake{ animation: boardShake .28s ease-in-out 1; }
-    @keyframes boardShake{
-      0%{ transform: translateX(0) }
-      18%{ transform: translateX(-3px) }
-      36%{ transform: translateX(3px) }
-      54%{ transform: translateX(-2px) }
-      72%{ transform: translateX(2px) }
-      100%{ transform: translateX(0) }
+    main{
+      flex:1;
+      min-height:0;
+      overflow:hidden;
+      padding: 10px 12px calc(12px + env(safe-area-inset-bottom));
     }
 
-    /* もともとの完成演出を強化（光る→色相が少し動く） */
+    .board{
+      width:min(920px, 100%);
+      height: 100%;
+      margin:0 auto;
+      background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(0,0,0,.12));
+      border: 1px solid rgba(255,255,255,.14);
+      border-radius: 18px;
+      padding: 12px;
+      overflow:hidden;
+      box-shadow:
+        0 18px 50px rgba(0,0,0,.30),
+        inset 0 0 0 1px rgba(0,0,0,.18);
+    }
+
+    .grid{
+      height: 100%;
+      display:grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: var(--gap);
+      align-content: start;               /* ★少数でも縦に伸びすぎない */
+      align-items: stretch;
+      grid-auto-rows: var(--row-h, 1fr);  /* ★N=10基準→入らなければN=50基準へ */
+      min-height:0;
+    }
+
+    .bottle{
+      position:relative;
+      height: 100%;
+      min-height: 0;
+      display:flex;
+      flex-direction:column;
+      padding: 8px 8px 10px;
+      border-radius: 16px;
+      background:
+        radial-gradient(120px 80px at 35% 20%, rgba(255,255,255,.18), rgba(255,255,255,0) 60%),
+        linear-gradient(180deg, rgba(255,255,255,.14), rgba(255,255,255,.05));
+      border: 1px solid rgba(255,255,255,.22);
+      box-shadow:
+        0 14px 34px rgba(0,0,0,.38),
+        inset 0 0 0 1px rgba(0,0,0,.22);
+      cursor:pointer;
+      user-select:none;
+      transition: transform .08s ease, box-shadow .12s ease, border-color .12s ease, filter .12s ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .bottle::before{
+      content:"";
+      position:absolute;
+      inset: 6px 6px 8px;
+      border-radius: 14px;
+      pointer-events:none;
+      border: 1px solid rgba(255,255,255,.14);
+      box-shadow:
+        inset 0 0 0 1px rgba(255,255,255,.06),
+        inset 0 -10px 18px rgba(0,0,0,.18);
+      background: linear-gradient(110deg, rgba(255,255,255,.18), rgba(255,255,255,0) 40%);
+      opacity:.75;
+      mix-blend-mode: screen;
+    }
+
+    .bottle:hover{ transform: translateY(-1px); }
+
+    .bottle.selected{
+      border-color: rgba(122,162,255,.95);
+      box-shadow: 0 0 0 2px rgba(122,162,255,.25), 0 12px 30px rgba(0,0,0,.30);
+    }
+
+    .bottle .neck{
+      flex: 0 0 auto;
+      height: 10px;
+      width: 42px;
+      margin: 0 auto 8px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.14);
+      border: 1px solid rgba(255,255,255,.22);
+      box-shadow:
+        inset 0 0 0 1px rgba(0,0,0,.18),
+        0 8px 16px rgba(0,0,0,.22);
+    }
+
+    .layers{
+      flex: 1 1 auto;
+      min-height: 0;
+      border-radius: 12px;
+      overflow:hidden;
+      display:flex;
+      flex-direction:column-reverse;
+      background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(0,0,0,.18));
+      border: 1px solid rgba(255,255,255,.18);
+      box-shadow:
+        inset 0 10px 22px rgba(0,0,0,.18),
+        inset 0 -10px 22px rgba(255,255,255,.05);
+    }
+
+    .layer{
+      flex: 1 1 20%;
+      min-height: 0;
+      border-top: 1px solid rgba(0,0,0,.25);
+      position:relative;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-weight: 900;
+      font-size: var(--mark-size);
+      letter-spacing: .2px;
+      text-shadow: 0 1px 2px rgba(0,0,0,.75), 0 0 8px rgba(0,0,0,.35);
+    }
+    .layer::after{
+      content:"";
+      position:absolute;
+      inset:0;
+      background: linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,0));
+      pointer-events:none;
+      mix-blend-mode: overlay;
+    }
+    .layer[data-mark]::before{
+      content: attr(data-mark);
+      color: rgba(255,255,255,.92);
+      mix-blend-mode: soft-light;
+    }
+
+    .layer.empty{
+      background: rgba(255,255,255,.08);
+      border-top: 1px solid rgba(255,255,255,.12);
+      background-image:
+        repeating-linear-gradient(90deg, rgba(0,0,0,.10) 0 6px, rgba(0,0,0,0) 6px 12px);
+    }
+
+    /* Nが小さい時は枠を強める */
+    body.lowN .bottle{
+      border-color: rgba(255,255,255,.34);
+      box-shadow:
+        0 18px 46px rgba(0,0,0,.44),
+        inset 0 0 0 1px rgba(0,0,0,.22);
+    }
+    body.lowN .bottle::before{
+      opacity: .92;
+      border-color: rgba(255,255,255,.22);
+    }
+    body.lowN .bottle .neck{
+      background: rgba(255,255,255,.18);
+      border-color: rgba(255,255,255,.30);
+    }
+    body.lowN .layers{
+      border-color: rgba(255,255,255,.24);
+      background: linear-gradient(180deg, rgba(255,255,255,.10), rgba(0,0,0,.18));
+    }
+    body.lowN .layer.empty{
+      background: rgba(255,255,255,.12);
+      border-top: 1px solid rgba(255,255,255,.16);
+      background-image:
+        repeating-linear-gradient(90deg, rgba(0,0,0,.14) 0 7px, rgba(0,0,0,0) 7px 14px);
+    }
+
+    /* パターン */
+    .layer.pat0{ background-image: repeating-linear-gradient(45deg, rgba(255,255,255,.22) 0 6px, rgba(0,0,0,0) 6px 12px); }
+    .layer.pat1{ background-image: repeating-linear-gradient(90deg, rgba(255,255,255,.20) 0 5px, rgba(0,0,0,0) 5px 10px); }
+    .layer.pat2{ background-image: repeating-linear-gradient(0deg, rgba(255,255,255,.20) 0 5px, rgba(0,0,0,0) 5px 10px); }
+    .layer.pat3{ background-image: radial-gradient(circle at 25% 30%, rgba(255,255,255,.20) 0 2px, rgba(0,0,0,0) 2px 10px), radial-gradient(circle at 70% 75%, rgba(255,255,255,.18) 0 2px, rgba(0,0,0,0) 2px 10px); background-size: 14px 14px; }
+    .layer.pat4{ background-image: repeating-linear-gradient(135deg, rgba(255,255,255,.18) 0 3px, rgba(0,0,0,0) 3px 9px); }
+    .layer.pat5{ background-image: repeating-linear-gradient(45deg, rgba(0,0,0,.18) 0 2px, rgba(0,0,0,0) 2px 8px), repeating-linear-gradient(-45deg, rgba(255,255,255,.14) 0 2px, rgba(0,0,0,0) 2px 8px); }
+    .layer.pat6{ background-image: linear-gradient(0deg, rgba(255,255,255,.18), rgba(0,0,0,0)), repeating-linear-gradient(90deg, rgba(0,0,0,.14) 0 2px, rgba(0,0,0,0) 2px 9px); }
+    .layer.pat7{ background-image: repeating-linear-gradient(0deg, rgba(0,0,0,.18) 0 2px, rgba(0,0,0,0) 2px 7px); }
+    .layer.pat8{ background-image: repeating-linear-gradient(90deg, rgba(0,0,0,.16) 0 2px, rgba(0,0,0,0) 2px 7px); }
+    .layer.pat9{ background-image: radial-gradient(circle at 50% 50%, rgba(255,255,255,.16) 0 3px, rgba(0,0,0,0) 3px 12px); background-size: 16px 16px; }
+    .layer.pat10{ background-image: linear-gradient(90deg, rgba(255,255,255,.14), rgba(0,0,0,0)), repeating-linear-gradient(135deg, rgba(0,0,0,.14) 0 2px, rgba(0,0,0,0) 2px 10px); }
+    .layer.pat11{ background-image: repeating-linear-gradient(45deg, rgba(255,255,255,.12) 0 2px, rgba(0,0,0,0) 2px 6px), repeating-linear-gradient(90deg, rgba(0,0,0,.10) 0 1px, rgba(0,0,0,0) 1px 6px); }
+
+    /* 満タン完成演出 */
+    .bottle.completed{
+      border-color: rgba(92,225,168,.55);
+      box-shadow: 0 0 0 2px rgba(92,225,168,.18), 0 14px 34px rgba(0,0,0,.32);
+    }
+    .bottle.completed .neck{
+      border-color: rgba(92,225,168,.45);
+      background: rgba(92,225,168,.10);
+    }
     .bottle.just-completed{
       animation: completedPulse .78s ease-out 1, hueWobble .62s ease-out 1;
+    }
+    @keyframes completedPulse{
+      0%{ transform: translateY(0) scale(1); filter: brightness(1); }
+      35%{ transform: translateY(-3px) scale(1.03); filter: brightness(1.10); }
+      100%{ transform: translateY(0) scale(1); filter: brightness(1); }
     }
     @keyframes hueWobble{
       0%{ filter: brightness(1) saturate(1); }
       30%{ filter: brightness(1.15) saturate(1.25); }
       100%{ filter: brightness(1) saturate(1); }
-    }
-
-    /* スマホ縦画面最適化 */
-    @media (max-width: 520px){
-      .grid{ grid-template-columns: repeat(4, minmax(82px, 1fr)); gap: 10px; }
-      .layers{ height: 168px; }
-    }
-    @media (max-width: 380px){
-      .grid{ grid-template-columns: repeat(3, minmax(86px, 1fr)); }
-      .layers{ height: 160px; }
     }
   </style>
 </head>
@@ -320,7 +372,12 @@
   <header>
     <div class="controls">
       <button id="undoBtn" disabled>一手戻る</button>
-      <button id="restartBtn" class="danger">リセット</button>
+      <button id="resetBtn" class="danger">リセット</button>
+      <button id="restartRunBtn">初めから</button>
+      <div class="nbox">
+        <input id="nInput" type="number" inputmode="numeric" min="1" max="50" step="1" value="3" aria-label="N" />
+        <button id="setNBtn">N開始</button>
+      </div>
     </div>
   </header>
 
@@ -335,7 +392,9 @@
 
 <script>
 (() => {
+  // ====== 仕様 ======
   const CAPACITY = 5;
+  const START_N = 3;
 
   function emptyBottleCount(n) {
     if (n < 7) return 2;
@@ -361,15 +420,18 @@
     return ((id % PATTERN_COUNT) + PATTERN_COUNT) % PATTERN_COUNT;
   }
 
+  // ====== 状態 ======
   let state = null;
+  let initialState = null; // リセットで戻す初期盤面
   let undoStack = [];
   let selectedFrom = -1;
   let autoAdvancePending = false;
   let justCompletedUntil = new Map();
 
-  let N = 3;
+  let N = START_N;
   let seed = 12345;
 
+  // ====== 乱数 ======
   function mulberry32(a) {
     return function() {
       let t = a += 0x6D2B79F5;
@@ -434,6 +496,7 @@
     return true;
   }
 
+  // ====== レベル生成（シャッフル） ======
   function generate(nColors, capacity, seedValue) {
     const empties = emptyBottleCount(nColors);
     const maxAttempts = 80;
@@ -471,6 +534,7 @@
       }
       if (mixed < Math.min(2, nColors)) continue;
 
+      // 解けてる形は弾く
       state = deepCopyState(s);
       if (isSolved()) continue;
 
@@ -480,117 +544,32 @@
     return deepCopyState(last);
   }
 
+  // ====== UI ======
   const grid = document.getElementById('grid');
   const undoBtn = document.getElementById('undoBtn');
-  const restartBtn = document.getElementById('restartBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const restartRunBtn = document.getElementById('restartRunBtn');
+  const nInput = document.getElementById('nInput');
+  const setNBtn = document.getElementById('setNBtn');
   const fx = document.getElementById('fx');
   const flash = document.getElementById('flash');
-  const board = document.querySelector('.board');
-  const headerEl = document.querySelector('header');
-  const mainEl = document.querySelector('main');
 
-  let fitRaf = 0;
-  function scheduleFit(){
-    if (fitRaf) return;
-    fitRaf = requestAnimationFrame(() => {
-      fitRaf = 0;
-      fitLayout();
-    });
-  }
-
-  function fitLayout(){
-    // なるべく“1画面内”に収める（スマホのアドレスバー変動に強い）
+  // viewportをJSで補正（iOSのアドレスバー変動対策）
+  function setVh() {
     const vv = window.visualViewport;
-    const vh = vv ? vv.height : window.innerHeight;
-    const headerH = headerEl ? headerEl.getBoundingClientRect().height : 0;
-
-    if (mainEl) {
-      mainEl.style.height = Math.max(0, vh - headerH) + 'px';
-    }
-    if (!board) return;
-
-    // mainの内側高さをボードに割り当てる
-    let mainInnerH = vh - headerH;
-    if (mainEl) {
-      const mr = mainEl.getBoundingClientRect();
-      const cs = getComputedStyle(mainEl);
-      const padT = parseFloat(cs.paddingTop) || 0;
-      const padB = parseFloat(cs.paddingBottom) || 0;
-      mainInnerH = mr.height - padT - padB;
-    }
-    board.style.height = Math.max(0, mainInnerH) + 'px';
-
-    // ボード内側サイズ
-    const br = board.getBoundingClientRect();
-    const bcs = getComputedStyle(board);
-    const bpadX = (parseFloat(bcs.paddingLeft) || 0) + (parseFloat(bcs.paddingRight) || 0);
-    const bpadY = (parseFloat(bcs.paddingTop) || 0) + (parseFloat(bcs.paddingBottom) || 0);
-    const innerW = Math.max(0, br.width - bpadX);
-    const innerH = Math.max(0, br.height - bpadY);
-
-    const count = state ? state.bottles.length : 0;
-    if (count <= 0) return;
-
-    const isSmall = window.innerWidth <= 520;
-    const gap = isSmall ? 8 : 12;
-
-    const minCols = 3;
-    const maxCols = Math.min(12, Math.max(minCols, count));
-    const minCellW = isSmall ? (window.innerWidth <= 380 ? 64 : 68) : 76;
-    const overhead = isSmall ? 56 : 60; // neck + padding 等のざっくり
-    const minLayersH = isSmall ? 88 : 110;
-
-    let best = null;
-    for (let cols = minCols; cols <= maxCols; cols++) {
-      const rows = Math.ceil(count / cols);
-      const cellW = (innerW - gap * (cols - 1)) / cols;
-      const cellH = (innerH - gap * (rows - 1)) / rows;
-      const layersH = cellH - overhead;
-
-      const ok = (cellW >= minCellW) && (layersH >= minLayersH);
-      const score = (Math.min(cellW, 140) * 0.7) + (Math.min(layersH, 220) * 1.3) + (ok ? 1000 : 0);
-
-      if (!best || score > best.score) {
-        best = { cols, rows, cellW, cellH, layersH, score };
-      }
-    }
-
-    if (!best) return;
-
-    grid.style.gridTemplateColumns = `repeat(${best.cols}, minmax(0, 1fr))`;
-    grid.style.setProperty('--gap', `${gap}px`);
-
-    const layersHpx = Math.max(70, Math.floor(best.layersH));
-    document.documentElement.style.setProperty('--layers-h', `${layersHpx}px`);
-
-    const markSize = Math.max(11, Math.min(16, Math.floor(layersHpx / 11) + 9));
-    document.documentElement.style.setProperty('--mark-size', `${markSize}px`);
+    const h = vv ? vv.height : window.innerHeight;
+    document.documentElement.style.setProperty('--vh', (h * 0.01) + 'px');
   }
-
-  window.addEventListener('resize', scheduleFit, { passive: true });
-  window.addEventListener('orientationchange', scheduleFit);
-  if (window.visualViewport) window.visualViewport.addEventListener('resize', scheduleFit);
-
 
   function playFlash() {
     if (!flash) return;
     flash.classList.remove('play');
-    // reflow
     void flash.offsetWidth;
     flash.classList.add('play');
   }
 
-  function shake() {
-    if (!board) return;
-    board.classList.remove('shake');
-    void board.offsetWidth;
-    board.classList.add('shake');
-  }
-
   function vibrate(ms) {
-    try {
-      if (navigator.vibrate) navigator.vibrate(ms);
-    } catch (_) {}
+    try { if (navigator.vibrate) navigator.vibrate(ms); } catch (_) {}
   }
 
   function spawnRingAt(x, y) {
@@ -623,8 +602,6 @@
       p.style.setProperty('--s', size.toFixed(0) + 'px');
       p.style.setProperty('--d', dur.toFixed(0) + 'ms');
       p.style.setProperty('--r', rot);
-
-      // ベース色 + 少し白寄せ
       p.style.setProperty('--c', baseColor);
 
       fx.appendChild(p);
@@ -642,7 +619,6 @@
   function completionFX(index) {
     const c = bottleCenter(index);
     if (!c) return;
-    // その瓶の色（なければ白）
     const b = state.bottles[index];
     const id = (b && b.length > 0) ? b[0] : -1;
     const base = (id >= 0) ? colorOf(id) : 'rgba(255,255,255,.9)';
@@ -650,23 +626,142 @@
     spawnRingAt(c.x, c.y);
     spawnParticlesAt(c.x, c.y, base, 26, 140);
     playFlash();
-    shake();
     vibrate(18);
   }
 
   function clearFX() {
-    // 画面中央で派手に
     const cx = window.innerWidth * 0.5;
     const cy = window.innerHeight * 0.42;
     spawnRingAt(cx, cy);
     spawnParticlesAt(cx, cy, 'rgba(255,255,255,.95)', 60, 260);
     playFlash();
-    shake();
     vibrate([20, 40, 20]);
   }
 
   function updateButtons() {
     undoBtn.disabled = undoStack.length === 0;
+  }
+
+  // ★瓶数に合わせてレイアウト再計算
+  let fitRaf = 0;
+  function scheduleFit(){
+    if (fitRaf) return;
+    fitRaf = requestAnimationFrame(() => {
+      fitRaf = 0;
+      fitLayout();
+    });
+  }
+
+  // ★デフォは「N=10のサイズ」。入らなくなったら「N=50のサイズ」に落とす。
+  // ★横一列を避け、画面に均等配置（正方形寄り）を優先。
+  function fitLayout(){
+    setVh();
+    const board = document.querySelector('.board');
+    if (!board || !state) return;
+
+    const br = board.getBoundingClientRect();
+    const bcs = getComputedStyle(board);
+    const bpadX = (parseFloat(bcs.paddingLeft) || 0) + (parseFloat(bcs.paddingRight) || 0);
+    const bpadY = (parseFloat(bcs.paddingTop) || 0) + (parseFloat(bcs.paddingBottom) || 0);
+
+    const innerW = Math.max(0, br.width - bpadX);
+    const innerH = Math.max(0, br.height - bpadY);
+
+    const count = state.bottles.length;
+    if (count <= 0) return;
+
+    const isSmall = window.innerWidth <= 520;
+    const gap = isSmall ? 8 : 12;
+    const minCols = 2;
+    const minW = isSmall ? 64 : 74;
+
+    // 画面比に近い（＝均等）・空きマス少なめ・横一列を避ける
+    function scoreLayout(cols, rows, bottleCount){
+      const emptySlots = cols * rows - bottleCount;
+      const gridAspect = cols / rows;
+      const screenAspect = innerW / innerH;
+      const aspectPenalty = Math.abs(gridAspect - screenAspect) * 28;
+
+      // 横一列（rows=1）は強めに避ける（ただし瓶数が少ない時は許容）
+      const oneRowPenalty = (rows === 1 && bottleCount > 3) ? 999 : 0;
+
+      return (-emptySlots * 7) - aspectPenalty - oneRowPenalty - (rows * 10);
+    }
+
+    // まずN=10時の「想定行高さ」を作る（この画面サイズ上で）
+    function pickBestCellHFor(bottleCount){
+      let best = null;
+      const maxCols = Math.min(12, Math.max(minCols, bottleCount));
+      for (let cols = minCols; cols <= maxCols; cols++) {
+        const rows = Math.ceil(bottleCount / cols);
+        const cellW = (innerW - gap * (cols - 1)) / cols;
+        const cellH = (innerH - gap * (rows - 1)) / rows;
+        if (cellW < minW) continue;
+        const sc = (cellH * 1.2) + scoreLayout(cols, rows, bottleCount);
+        if (!best || sc > best.score) best = { cols, rows, cellW, cellH, score: sc };
+      }
+      if (!best) {
+        const cols = Math.min(4, Math.min(12, Math.max(minCols, bottleCount)));
+        const rows = Math.ceil(bottleCount / cols);
+        const cellW = (innerW - gap * (cols - 1)) / cols;
+        const cellH = (innerH - gap * (rows - 1)) / rows;
+        best = { cols, rows, cellW, cellH, score: 0 };
+      }
+      return best;
+    }
+
+    const count10 = 10 + emptyBottleCount(10);
+    const count50 = 50 + emptyBottleCount(50);
+
+    const ref10 = pickBestCellHFor(count10);
+    const ref50 = pickBestCellHFor(count50);
+
+    // デフォはN=10サイズ。入らなければN=50サイズに落とす。
+    const rowH10 = Math.max(72, Math.floor(ref10.cellH));
+    const rowH50 = Math.max(60, Math.floor(ref50.cellH));
+
+    function chooseLayoutFixedRowH(bottleCount, rowH){
+      let best = null;
+      const maxCols = Math.min(12, Math.max(minCols, bottleCount));
+      for (let cols = minCols; cols <= maxCols; cols++) {
+        const rows = Math.ceil(bottleCount / cols);
+
+        const cellW = (innerW - gap * (cols - 1)) / cols;
+        if (cellW < minW) continue;
+
+        const totalH = rows * rowH + gap * (rows - 1);
+        if (totalH > innerH + 0.5) continue;
+
+        const sc = (cellW * 1.2) + scoreLayout(cols, rows, bottleCount);
+        if (!best || sc > best.score) best = { cols, rows, rowH, cellW, score: sc };
+      }
+      return best;
+    }
+
+    let chosen = chooseLayoutFixedRowH(count, rowH10);
+    let chosenRowH = rowH10;
+
+    if (!chosen) {
+      chosen = chooseLayoutFixedRowH(count, rowH50);
+      chosenRowH = rowH50;
+    }
+
+    // それでもダメなら、最後に縮める（保険）
+    if (!chosen) {
+      const rough = pickBestCellHFor(count);
+      chosen = { cols: rough.cols, rows: rough.rows, rowH: Math.max(56, Math.floor(rough.cellH)), cellW: rough.cellW, score: 0 };
+      chosenRowH = chosen.rowH;
+    }
+
+    grid.style.gridTemplateColumns = `repeat(${chosen.cols}, minmax(0, 1fr))`;
+    document.documentElement.style.setProperty('--gap', `${gap}px`);
+    document.documentElement.style.setProperty('--row-h', `${chosenRowH}px`);
+
+    // マークサイズは液体エリアから推定
+    const overhead = isSmall ? 54 : 58;
+    const layersH = Math.max(38, chosenRowH - overhead);
+    const markSize = Math.max(10, Math.min(16, Math.floor(layersH / 9) + 7));
+    document.documentElement.style.setProperty('--mark-size', `${markSize}px`);
   }
 
   function render() {
@@ -761,10 +856,8 @@
     selectedFrom = -1;
     render();
 
-    // 満タンになった瓶の派手演出
     for (const i of newly) completionFX(i);
 
-    // クリア時演出（さらに派手）
     if (moved > 0 && isSolved()) {
       clearFX();
       autoAdvancePending = true;
@@ -780,12 +873,17 @@
     N = n;
     seed = newSeed;
     state = generate(N, CAPACITY, seed);
+    initialState = deepCopyState(state);
+    if (nInput) nInput.value = String(N);
+    document.body.classList.toggle('lowN', N <= 5);
+
     undoStack = [];
     selectedFrom = -1;
     justCompletedUntil = new Map();
     render();
   }
 
+  // 一手戻る
   undoBtn.addEventListener('click', () => {
     if (undoStack.length === 0) return;
     state = undoStack.pop();
@@ -794,14 +892,47 @@
     render();
   });
 
-  restartBtn.addEventListener('click', () => {
-    seed++;
-    startLevel(N, seed);
-  scheduleFit();
+  // リセット：今の盤面を「初期配置」に戻す
+  resetBtn.addEventListener('click', () => {
+    if (!initialState) return;
+    state = deepCopyState(initialState);
+    undoStack = [];
+    selectedFrom = -1;
+    justCompletedUntil = new Map();
+    render();
   });
 
+  // 初めから：N=3に戻して新しい問題
+  restartRunBtn.addEventListener('click', () => {
+    seed = (seed + 1000) >>> 0;
+    startLevel(START_N, seed);
+  });
+
+  function readDesiredN(){
+    let v = parseInt(nInput ? nInput.value : String(START_N), 10);
+    if (!Number.isFinite(v)) v = START_N;
+    v = Math.max(1, Math.min(50, v));
+    return v;
+  }
+
+  setNBtn.addEventListener('click', () => {
+    const v = readDesiredN();
+    seed = (seed + 1000) >>> 0;
+    startLevel(v, seed);
+  });
+
+  nInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') setNBtn.click();
+  });
+
+  // resize対策
+  window.addEventListener('resize', scheduleFit, { passive: true });
+  window.addEventListener('orientationchange', scheduleFit);
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', scheduleFit);
+
   // 初期起動
-  startLevel(N, seed);
+  setVh();
+  startLevel(START_N, seed);
 })();
 </script>
 </body>
